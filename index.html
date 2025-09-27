@@ -31,11 +31,26 @@
         font-weight: 600;
         color: #374151;
     }
-    select, input {
+    select, input[type="text"] {
         padding: 8px 12px;
         border: 1px solid #d1d5db;
         border-radius: 6px;
         font-size: 0.9em;
+    }
+    
+    /* チェックボックススタイル */
+    input[type="checkbox"] {
+        margin-right: 8px;
+        transform: scale(1.2);
+    }
+    
+    .control-group label {
+        display: flex;
+        align-items: center;
+        cursor: pointer;
+        font-size: 0.9em;
+        font-weight: 600;
+        color: #374151;
     }
     button {
         padding: 8px 16px;
@@ -141,10 +156,23 @@
         .control-group {
             width: 100%;
         }
-        select, input, button { 
+        select, input[type="text"], button { 
             width: 100%; 
             padding: 12px;
             font-size: 16px; /* iOS ズーム防止 */
+        }
+        
+        input[type="checkbox"] {
+            width: auto;
+            margin-right: 12px;
+            transform: scale(1.5);
+        }
+        
+        .control-group label {
+            width: 100%;
+            justify-content: flex-start;
+            padding: 8px 0;
+            font-size: 16px;
         }
         
         /* テーブルをカード形式に変更 */
@@ -280,6 +308,13 @@
                 <option value='2026-02'>2026年2月</option>
                 <option value='2026-03'>2026年3月</option>
             </select>
+        </div>
+        
+        <div class='control-group'>
+            <label>
+                <input type='checkbox' id='hidePastEvents' checked> 
+                過去のイベントを非表示
+            </label>
         </div>
         
         <button onclick='clearFilters()'>フィルターをクリア</button>
@@ -973,8 +1008,10 @@
             this.schoolFilter = document.getElementById('schoolFilter');
             this.eventFilter = document.getElementById('eventFilter');
             this.dateFilter = document.getElementById('dateFilter');
+            this.hidePastEvents = document.getElementById('hidePastEvents');
             this.resultCount = document.getElementById('resultCount');
             this.rows = document.querySelectorAll('#eventTable tbody tr');
+            this.today = new Date();
             
             this.init();
         }
@@ -983,11 +1020,15 @@
             this.schoolFilter.addEventListener('change', () => this.applyFilters());
             this.eventFilter.addEventListener('change', () => this.applyFilters());
             this.dateFilter.addEventListener('change', () => this.applyFilters());
+            this.hidePastEvents.addEventListener('change', () => this.applyFilters());
             
             // 学校統計クリックイベント
             document.querySelectorAll('.stat-item').forEach(item => {
                 item.addEventListener('click', () => this.selectSchool(item));
             });
+            
+            // 初期フィルタリング（過去イベント非表示）
+            this.applyFilters();
         }
         
         selectSchool(statItem) {
@@ -1048,6 +1089,30 @@
                 return false;
             }
             
+            // 過去イベント非表示フィルター
+            if (this.hidePastEvents.checked) {
+                let targetDate = dateCell;
+                
+                // 空白の場合は前の日付を持つ行を探す
+                if (!targetDate) {
+                    const currentIndex = Array.from(this.rows).indexOf(row);
+                    for (let i = currentIndex - 1; i >= 0; i--) {
+                        const prevDate = this.rows[i].cells[0].textContent.trim();
+                        if (prevDate) {
+                            targetDate = prevDate;
+                            break;
+                        }
+                    }
+                }
+                
+                if (targetDate) {
+                    const eventDate = this.parseJapaneseDate(targetDate);
+                    if (eventDate && eventDate < this.today) {
+                        return false;
+                    }
+                }
+            }
+            
             // 日付フィルター（空白セルの場合は前の行の日付を参照）
             if (dateValue) {
                 let targetDate = dateCell;
@@ -1078,6 +1143,21 @@
             return true;
         }
         
+        parseJapaneseDate(dateStr) {
+            if (!dateStr) return null;
+            
+            const match = dateStr.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+            if (!match) return null;
+            
+            const [, year, month, day] = match;
+            const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+            
+            // 今日の日付と比較するため、時間を0にセット
+            date.setHours(0, 0, 0, 0);
+            
+            return date;
+        }
+        
 
     }
     
@@ -1086,16 +1166,17 @@
         document.getElementById('schoolFilter').value = '';
         document.getElementById('eventFilter').value = '';
         document.getElementById('dateFilter').value = '';
+        document.getElementById('hidePastEvents').checked = true; // 過去イベント非表示はデフォルトでON
         
         document.querySelectorAll('.stat-item').forEach(item => {
             item.classList.remove('selected');
         });
         
-        document.querySelectorAll('#eventTable tbody tr').forEach(row => {
-            row.classList.remove('hidden');
-        });
-        
-        document.getElementById('resultCount').textContent = '90件のイベントを表示中';
+        // フィルターを再適用（過去イベント非表示のため）
+        const tableFilter = window.tableFilterInstance;
+        if (tableFilter) {
+            tableFilter.applyFilters();
+        }
     }
     
     // モバイルカード管理クラス
@@ -1147,8 +1228,10 @@
             // リサイズ後のフィルター再適用は TableFilter クラスで処理
         }
         
-        applyFilters(schoolValue, eventValue, dateValue) {
+        applyFilters(schoolValue, eventValue, dateValue, hidePastEvents) {
             const cards = this.mobileContainer.querySelectorAll('.event-card');
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
             let visibleCount = 0;
             
             cards.forEach(card => {
@@ -1166,6 +1249,30 @@
                 // イベントフィルター
                 if (eventValue && cardType !== eventValue) {
                     visible = false;
+                }
+                
+                // 過去イベント非表示フィルター
+                if (hidePastEvents) {
+                    let targetDate = cardDate;
+                    
+                    // 空白の場合は前のカードの日付を参照
+                    if (!targetDate) {
+                        const cardIndex = Array.from(cards).indexOf(card);
+                        for (let i = cardIndex - 1; i >= 0; i--) {
+                            const prevDate = cards[i].dataset.date;
+                            if (prevDate) {
+                                targetDate = prevDate;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (targetDate) {
+                        const eventDate = this.parseJapaneseDate(targetDate);
+                        if (eventDate && eventDate < today) {
+                            visible = false;
+                        }
+                    }
                 }
                 
                 // 日付フィルター
@@ -1211,6 +1318,19 @@
             
             return visibleCount;
         }
+        
+        parseJapaneseDate(dateStr) {
+            if (!dateStr) return null;
+            
+            const match = dateStr.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+            if (!match) return null;
+            
+            const [, year, month, day] = match;
+            const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+            date.setHours(0, 0, 0, 0);
+            
+            return date;
+        }
     }
 
     // 初期化
@@ -1218,6 +1338,9 @@
         new TableSorter('eventTable');
         const tableFilter = new TableFilter();
         const mobileCards = new MobileCardManager();
+        
+        // グローバルにアクセス可能にする（clearFilters関数用）
+        window.tableFilterInstance = tableFilter;
         
         // TableFilter を拡張してモバイルカードも更新
         const originalApplyFilters = tableFilter.applyFilters.bind(tableFilter);
@@ -1228,8 +1351,9 @@
             const schoolValue = this.schoolFilter.value;
             const eventValue = this.eventFilter.value;
             const dateValue = this.dateFilter.value;
+            const hidePastEvents = this.hidePastEvents.checked;
             
-            const mobileVisibleCount = mobileCards.applyFilters(schoolValue, eventValue, dateValue);
+            const mobileVisibleCount = mobileCards.applyFilters(schoolValue, eventValue, dateValue, hidePastEvents);
             
             // 結果カウンターは既にテーブル側で更新されているので、
             // モバイル表示時のみカウンターを更新

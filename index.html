@@ -312,7 +312,7 @@
         
         <div class='control-group'>
             <label>
-                <input type='checkbox' id='hidePastEvents' checked> 
+                <input type='checkbox' id='hidePastEvents'> 
                 過去のイベントを非表示
             </label>
         </div>
@@ -1027,8 +1027,7 @@
                 item.addEventListener('click', () => this.selectSchool(item));
             });
             
-            // 初期フィルタリング（過去イベント非表示）
-            this.applyFilters();
+            // 初期フィルタリングは後で実行
         }
         
         selectSchool(statItem) {
@@ -1166,13 +1165,13 @@
         document.getElementById('schoolFilter').value = '';
         document.getElementById('eventFilter').value = '';
         document.getElementById('dateFilter').value = '';
-        document.getElementById('hidePastEvents').checked = true; // 過去イベント非表示はデフォルトでON
+        document.getElementById('hidePastEvents').checked = false; // 過去イベント非表示はオフ
         
         document.querySelectorAll('.stat-item').forEach(item => {
             item.classList.remove('selected');
         });
         
-        // フィルターを再適用（過去イベント非表示のため）
+        // フィルターを再適用
         const tableFilter = window.tableFilterInstance;
         if (tableFilter) {
             tableFilter.applyFilters();
@@ -1341,26 +1340,31 @@
         
         // グローバルにアクセス可能にする（clearFilters関数用）
         window.tableFilterInstance = tableFilter;
+        window.mobileCardsInstance = mobileCards;
         
         // TableFilter を拡張してモバイルカードも更新
         const originalApplyFilters = tableFilter.applyFilters.bind(tableFilter);
         tableFilter.applyFilters = function() {
-            originalApplyFilters();
-            
-            // モバイルカードにも同じフィルターを適用
             const schoolValue = this.schoolFilter.value;
             const eventValue = this.eventFilter.value;
             const dateValue = this.dateFilter.value;
             const hidePastEvents = this.hidePastEvents.checked;
             
+            // テーブルフィルター適用
+            originalApplyFilters();
+            
+            // モバイルカードにも同じフィルターを適用
             const mobileVisibleCount = mobileCards.applyFilters(schoolValue, eventValue, dateValue, hidePastEvents);
             
-            // 結果カウンターは既にテーブル側で更新されているので、
-            // モバイル表示時のみカウンターを更新
+            // 結果カウンターは既にテーブル側で更新されているが、
+            // モバイル表示時はモバイルのカウントを使用
             if (window.innerWidth <= 768) {
                 this.resultCount.textContent = `${mobileVisibleCount}件のイベントを表示中`;
             }
         };
+        
+        // 初期フィルタリング実行
+        tableFilter.applyFilters();
     });
     </script>
     

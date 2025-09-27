@@ -909,46 +909,18 @@
             const dateValue = this.dateFilter.value;
             
             let visibleCount = 0;
-            let currentDateGroup = null;
-            let groupVisible = false;
             
-            this.rows.forEach((row, index) => {
-                const schoolCell = row.cells[1].textContent.trim();
-                const eventCell = row.cells[2].textContent.trim();
-                const dateCell = row.cells[0].textContent.trim();
+            // 各行を個別にフィルタリング
+            this.rows.forEach(row => {
+                const visible = this.isRowVisible(row, schoolValue, eventValue, dateValue);
                 
-                // 新しい日付グループかどうかを判定
-                if (dateCell !== '') {
-                    // 前のグループの処理完了
-                    if (currentDateGroup) {
-                        this.applyGroupVisibility(currentDateGroup, groupVisible);
-                        if (groupVisible) {
-                            visibleCount += currentDateGroup.length;
-                        }
-                    }
-                    
-                    // 新しいグループ開始
-                    currentDateGroup = [row];
-                    groupVisible = this.isRowVisible(row, schoolValue, eventValue, dateValue);
+                if (visible) {
+                    row.classList.remove('hidden');
+                    visibleCount++;
                 } else {
-                    // 同じ日付グループの追加行
-                    if (currentDateGroup) {
-                        currentDateGroup.push(row);
-                        // グループ内で一つでも表示条件を満たせばグループ全体を表示
-                        if (this.isRowVisible(row, schoolValue, eventValue, dateValue)) {
-                            groupVisible = true;
-                        }
-                    }
+                    row.classList.add('hidden');
                 }
             });
-            
-            // 最後のグループの処理
-            if (currentDateGroup) {
-                this.applyGroupVisibility(currentDateGroup, groupVisible);
-                if (groupVisible) {
-                    visibleCount += currentDateGroup.length;
-                }
-            }
             
             this.resultCount.textContent = `${visibleCount}件のイベントを表示中`;
         }
@@ -998,15 +970,7 @@
             return true;
         }
         
-        applyGroupVisibility(group, visible) {
-            group.forEach(row => {
-                if (visible) {
-                    row.classList.remove('hidden');
-                } else {
-                    row.classList.add('hidden');
-                }
-            });
-        }
+
     }
     
     // フィルタークリア関数

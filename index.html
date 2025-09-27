@@ -244,6 +244,12 @@
     .mobile-cards {
         display: none;
     }
+    
+    @media (max-width: 768px) {
+        .mobile-cards {
+            display: block !important;
+        }
+    }
     </style>
 </head>
 <body>
@@ -1183,44 +1189,67 @@
         constructor() {
             this.mobileContainer = document.getElementById('mobileCards');
             this.tableRows = document.querySelectorAll('#eventTable tbody tr');
+            console.log('MobileCardManager initialized:', this.mobileContainer, this.tableRows.length);
             this.init();
         }
         
         init() {
-            this.generateCards();
-            // ウィンドウリサイズ時の対応
-            window.addEventListener('resize', () => this.handleResize());
+            try {
+                this.generateCards();
+                console.log('Cards generated successfully');
+                // ウィンドウリサイズ時の対応
+                window.addEventListener('resize', () => this.handleResize());
+            } catch (error) {
+                console.error('Error in MobileCardManager init:', error);
+            }
         }
         
         generateCards() {
-            this.mobileContainer.innerHTML = '';
+            if (!this.mobileContainer) {
+                console.error('Mobile container not found');
+                return;
+            }
             
-            this.tableRows.forEach(row => {
-                const dateCell = row.cells[0].textContent.trim();
-                const schoolCell = row.cells[1].textContent.trim();
-                const typeCell = row.cells[2].textContent.trim();
-                const linkCell = row.cells[3].querySelector('a');
-                
-                const card = document.createElement('div');
-                card.className = 'event-card';
-                card.dataset.school = schoolCell;
-                card.dataset.type = typeCell;
-                card.dataset.date = dateCell;
-                
-                // 日付表示（空白の場合は非表示）
-                const dateDisplay = dateCell ? `<div class='event-date'>${dateCell}</div>` : '';
-                
-                card.innerHTML = `
-                    ${dateDisplay}
-                    <div class='event-school'>${schoolCell}</div>
-                    <div class='event-type'>${typeCell}</div>
-                    <div class='event-link'>
-                        <a href='${linkCell.href}' target='_blank'>詳細を見る</a>
-                    </div>
-                `;
-                
-                this.mobileContainer.appendChild(card);
+            this.mobileContainer.innerHTML = '';
+            console.log('Generating cards for', this.tableRows.length, 'rows');
+            
+            this.tableRows.forEach((row, index) => {
+                try {
+                    const dateCell = row.cells[0].textContent.trim();
+                    const schoolCell = row.cells[1].textContent.trim();
+                    const typeCell = row.cells[2].textContent.trim();
+                    const linkCell = row.cells[3].querySelector('a');
+                    
+                    if (!linkCell) {
+                        console.warn('No link found for row', index);
+                        return;
+                    }
+                    
+                    const card = document.createElement('div');
+                    card.className = 'event-card';
+                    card.dataset.school = schoolCell;
+                    card.dataset.type = typeCell;
+                    card.dataset.date = dateCell;
+                    
+                    // 日付表示（空白の場合は非表示）
+                    const dateDisplay = dateCell ? `<div class='event-date'>${dateCell}</div>` : '';
+                    
+                    card.innerHTML = `
+                        ${dateDisplay}
+                        <div class='event-school'>${schoolCell}</div>
+                        <div class='event-type'>${typeCell}</div>
+                        <div class='event-link'>
+                            <a href='${linkCell.href}' target='_blank'>詳細を見る</a>
+                        </div>
+                    `;
+                    
+                    this.mobileContainer.appendChild(card);
+                } catch (error) {
+                    console.error('Error generating card for row', index, error);
+                }
             });
+            
+            console.log('Total cards created:', this.mobileContainer.children.length);
         }
         
         handleResize() {
@@ -1334,37 +1363,62 @@
 
     // 初期化
     document.addEventListener('DOMContentLoaded', function() {
-        new TableSorter('eventTable');
-        const tableFilter = new TableFilter();
-        const mobileCards = new MobileCardManager();
+        console.log('DOM Content Loaded, window width:', window.innerWidth);
         
-        // グローバルにアクセス可能にする（clearFilters関数用）
-        window.tableFilterInstance = tableFilter;
-        window.mobileCardsInstance = mobileCards;
-        
-        // TableFilter を拡張してモバイルカードも更新
-        const originalApplyFilters = tableFilter.applyFilters.bind(tableFilter);
-        tableFilter.applyFilters = function() {
-            const schoolValue = this.schoolFilter.value;
-            const eventValue = this.eventFilter.value;
-            const dateValue = this.dateFilter.value;
-            const hidePastEvents = this.hidePastEvents.checked;
+        try {
+            new TableSorter('eventTable');
+            const tableFilter = new TableFilter();
+            const mobileCards = new MobileCardManager();
             
-            // テーブルフィルター適用
-            originalApplyFilters();
+            // グローバルにアクセス可能にする（clearFilters関数用）
+            window.tableFilterInstance = tableFilter;
+            window.mobileCardsInstance = mobileCards;
             
-            // モバイルカードにも同じフィルターを適用
-            const mobileVisibleCount = mobileCards.applyFilters(schoolValue, eventValue, dateValue, hidePastEvents);
+            // TableFilter を拡張してモバイルカードも更新
+            const originalApplyFilters = tableFilter.applyFilters.bind(tableFilter);
+            tableFilter.applyFilters = function() {
+                const schoolValue = this.schoolFilter.value;
+                const eventValue = this.eventFilter.value;
+                const dateValue = this.dateFilter.value;
+                const hidePastEvents = this.hidePastEvents.checked;
+                
+                console.log('Applying filters - mobile width check:', window.innerWidth <= 768);
+                
+                // テーブルフィルター適用
+                originalApplyFilters();
+                
+                // モバイルカードにも同じフィルターを適用
+                try {
+                    const mobileVisibleCount = mobileCards.applyFilters(schoolValue, eventValue, dateValue, hidePastEvents);
+                    console.log('Mobile visible count:', mobileVisibleCount);
+                    
+                    // 結果カウンターは既にテーブル側で更新されているが、
+                    // モバイル表示時はモバイルのカウントを使用
+                    if (window.innerWidth <= 768) {
+                        this.resultCount.textContent = `${mobileVisibleCount}件のイベントを表示中`;
+                    }
+                } catch (error) {
+                    console.error('Error applying mobile filters:', error);
+                }
+            };
             
-            // 結果カウンターは既にテーブル側で更新されているが、
-            // モバイル表示時はモバイルのカウントを使用
+            // 初期フィルタリング実行
+            console.log('Starting initial filter application');
+            tableFilter.applyFilters();
+            
+            // モバイル表示かどうかチェック
             if (window.innerWidth <= 768) {
-                this.resultCount.textContent = `${mobileVisibleCount}件のイベントを表示中`;
+                console.log('Mobile view detected, ensuring cards are visible');
+                const mobileContainer = document.getElementById('mobileCards');
+                if (mobileContainer) {
+                    console.log('Mobile container found, cards count:', mobileContainer.children.length);
+                    mobileContainer.style.display = 'block';
+                }
             }
-        };
-        
-        // 初期フィルタリング実行
-        tableFilter.applyFilters();
+            
+        } catch (error) {
+            console.error('Error during initialization:', error);
+        }
     });
     </script>
     

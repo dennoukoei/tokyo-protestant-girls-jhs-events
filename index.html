@@ -894,7 +894,7 @@
             this.table = document.getElementById(tableId);
             this.tbody = this.table.querySelector('tbody');
             this.headers = this.table.querySelectorAll('th.sortable');
-            this.currentSort = { column: 0, direction: 'asc' };
+            this.currentSort = { column: -1, direction: 'desc' }; // 初期状態を変更して最初のソートが昇順になるように
             
             this.init();
         }
@@ -904,7 +904,7 @@
                 header.addEventListener('click', () => this.sortTable(index));
             });
             
-            // 初期ソート（日付順）
+            // 初期ソート（日付順昇順）
             this.sortTable(0);
         }
         

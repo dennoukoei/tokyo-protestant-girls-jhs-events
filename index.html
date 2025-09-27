@@ -8,17 +8,111 @@
     body { font-family: system-ui, -apple-system, sans-serif; margin: 20px; }
     h1 { color: #333; border-bottom: 2px solid #0ea5e9; padding-bottom: 10px; }
     .summary { background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0; }
+    
+    /* コントロールパネル */
+    .controls { 
+        background: #fff; 
+        padding: 15px; 
+        border-radius: 8px; 
+        border: 1px solid #e5e7eb;
+        margin: 20px 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+        align-items: center;
+    }
+    .control-group {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+    .control-group label {
+        font-size: 0.9em;
+        font-weight: 600;
+        color: #374151;
+    }
+    select, input {
+        padding: 8px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 0.9em;
+    }
+    button {
+        padding: 8px 16px;
+        background: #0ea5e9;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.9em;
+        transition: background 0.2s;
+    }
+    button:hover {
+        background: #0284c7;
+    }
+    
+    /* テーブル */
     table { width: 100%; border-collapse: collapse; margin: 20px 0; }
     th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; }
-    th { background: #f8f9fa; font-weight: bold; }
+    th { 
+        background: #f8f9fa; 
+        font-weight: bold; 
+        cursor: pointer;
+        user-select: none;
+        position: relative;
+        transition: background 0.2s;
+    }
+    th:hover {
+        background: #e9ecef;
+    }
+    th.sortable::after {
+        content: ' ↕️';
+        font-size: 0.8em;
+        opacity: 0.5;
+    }
+    th.sort-asc::after {
+        content: ' ↑';
+        opacity: 1;
+    }
+    th.sort-desc::after {
+        content: ' ↓';
+        opacity: 1;
+    }
+    
     .date-cell { white-space: nowrap; font-weight: bold; }
     .school-cell { font-weight: 600; }
     .type-cell { font-size: 0.9em; }
     .link-cell a { color: #0ea5e9; text-decoration: none; }
     .link-cell a:hover { text-decoration: underline; }
-    tr:nth-child(even) { background: #f9f9f9; }
+    
+    /* 行のスタイル */
+    tbody tr:nth-child(even) { background: #f9f9f9; }
+    tbody tr:hover { background: #f1f5f9; }
+    tbody tr.hidden { display: none; }
+    
     .school-stats { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0; }
-    .stat-item { background: #e3f2fd; padding: 5px 10px; border-radius: 20px; font-size: 0.9em; }
+    .stat-item { 
+        background: #e3f2fd; 
+        padding: 5px 10px; 
+        border-radius: 20px; 
+        font-size: 0.9em;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+    .stat-item:hover {
+        background: #bbdefb;
+    }
+    .stat-item.selected {
+        background: #2196f3;
+        color: white;
+    }
+    
+    /* カウンター */
+    .result-count {
+        margin: 10px 0;
+        font-weight: 600;
+        color: #374151;
+    }
     </style>
 </head>
 <body>
@@ -28,15 +122,74 @@
         <p><strong>対象校:</strong> 女子学院中学校, 女子聖学院中学校, 恵泉女学園中学校, 普連土学園中学校, 東洋英和女学院中学部, 玉川聖学院中等部, 頌栄女子学院中学校, 香蘭女学校中等科</p>
         <p><strong>期間:</strong> 2025年9月～2026年3月</p>
         <p><strong>総イベント数:</strong> 90件</p>
-        <div class='school-stats'><span class='stat-item'>女子学院中学校: 5件</span><span class='stat-item'>女子聖学院中学校: 10件</span><span class='stat-item'>恵泉女学園中学校: 8件</span><span class='stat-item'>普連土学園中学校: 9件</span><span class='stat-item'>東洋英和女学院中学部: 6件</span><span class='stat-item'>玉川聖学院中等部: 28件</span><span class='stat-item'>頌栄女子学院中学校: 19件</span><span class='stat-item'>香蘭女学校中等科: 5件</span></div>
+        <div class='school-stats'>
+            <span class='stat-item' data-school='女子学院中学校'>女子学院中学校: 5件</span>
+            <span class='stat-item' data-school='女子聖学院中学校'>女子聖学院中学校: 10件</span>
+            <span class='stat-item' data-school='恵泉女学園中学校'>恵泉女学園中学校: 8件</span>
+            <span class='stat-item' data-school='普連土学園中学校'>普連土学園中学校: 9件</span>
+            <span class='stat-item' data-school='東洋英和女学院中学部'>東洋英和女学院中学部: 6件</span>
+            <span class='stat-item' data-school='玉川聖学院中等部'>玉川聖学院中等部: 28件</span>
+            <span class='stat-item' data-school='頌栄女子学院中学校'>頌栄女子学院中学校: 19件</span>
+            <span class='stat-item' data-school='香蘭女学校中等科'>香蘭女学校中等科: 5件</span>
+        </div>
     </div>
     
-    <table>
+    <!-- コントロールパネル -->
+    <div class='controls'>
+        <div class='control-group'>
+            <label for='schoolFilter'>学校で絞り込み:</label>
+            <select id='schoolFilter'>
+                <option value=''>全ての学校</option>
+                <option value='女子学院中学校'>女子学院中学校</option>
+                <option value='女子聖学院中学校'>女子聖学院中学校</option>
+                <option value='恵泉女学園中学校'>恵泉女学園中学校</option>
+                <option value='普連土学園中学校'>普連土学園中学校</option>
+                <option value='東洋英和女学院中学部'>東洋英和女学院中学部</option>
+                <option value='玉川聖学院中等部'>玉川聖学院中等部</option>
+                <option value='頌栄女子学院中学校'>頌栄女子学院中学校</option>
+                <option value='香蘭女学校中等科'>香蘭女学校中等科</option>
+            </select>
+        </div>
+        
+        <div class='control-group'>
+            <label for='eventFilter'>イベント種別:</label>
+            <select id='eventFilter'>
+                <option value=''>全てのイベント</option>
+                <option value='説明会'>説明会</option>
+                <option value='見学会'>見学会</option>
+                <option value='オープンスクール'>オープンスクール</option>
+                <option value='体験'>体験</option>
+                <option value='イベント'>イベント</option>
+                <option value='文化祭/体育祭'>文化祭/体育祭</option>
+                <option value='その他'>その他</option>
+            </select>
+        </div>
+        
+        <div class='control-group'>
+            <label for='dateFilter'>月で絞り込み:</label>
+            <select id='dateFilter'>
+                <option value=''>全ての月</option>
+                <option value='2025-09'>2025年9月</option>
+                <option value='2025-10'>2025年10月</option>
+                <option value='2025-11'>2025年11月</option>
+                <option value='2025-12'>2025年12月</option>
+                <option value='2026-01'>2026年1月</option>
+                <option value='2026-02'>2026年2月</option>
+                <option value='2026-03'>2026年3月</option>
+            </select>
+        </div>
+        
+        <button onclick='clearFilters()'>フィルターをクリア</button>
+    </div>
+    
+    <div class='result-count' id='resultCount'>90件のイベントを表示中</div>
+    
+    <table id='eventTable'>
         <thead>
             <tr>
-                <th>日付</th>
-                <th>学校名</th>
-                <th>イベント種別</th>
+                <th class='sortable' data-column='0'>日付</th>
+                <th class='sortable' data-column='1'>学校名</th>
+                <th class='sortable' data-column='2'>イベント種別</th>
                 <th>リンク</th>
             </tr>
         </thead>
@@ -584,6 +737,221 @@
             </tr>
         </tbody>
     </table>
+    
+    <script>
+    // ソート機能
+    class TableSorter {
+        constructor(tableId) {
+            this.table = document.getElementById(tableId);
+            this.tbody = this.table.querySelector('tbody');
+            this.headers = this.table.querySelectorAll('th.sortable');
+            this.currentSort = { column: 0, direction: 'asc' };
+            
+            this.init();
+        }
+        
+        init() {
+            this.headers.forEach((header, index) => {
+                header.addEventListener('click', () => this.sortTable(index));
+            });
+            
+            // 初期ソート（日付順）
+            this.sortTable(0);
+        }
+        
+        sortTable(columnIndex) {
+            const direction = this.currentSort.column === columnIndex && this.currentSort.direction === 'asc' ? 'desc' : 'asc';
+            
+            // ヘッダーのクラス更新
+            this.headers.forEach(header => {
+                header.classList.remove('sort-asc', 'sort-desc');
+            });
+            this.headers[columnIndex].classList.add(direction === 'asc' ? 'sort-asc' : 'sort-desc');
+            
+            // 行の取得とソート
+            const rows = Array.from(this.tbody.querySelectorAll('tr:not(.hidden)'));
+            const allRows = Array.from(this.tbody.querySelectorAll('tr'));
+            
+            rows.sort((a, b) => {
+                const aValue = this.getCellValue(a, columnIndex);
+                const bValue = this.getCellValue(b, columnIndex);
+                
+                if (columnIndex === 0) { // 日付列
+                    return direction === 'asc' ? 
+                        this.compareDates(aValue, bValue) : 
+                        this.compareDates(bValue, aValue);
+                } else {
+                    return direction === 'asc' ? 
+                        aValue.localeCompare(bValue, 'ja') : 
+                        bValue.localeCompare(aValue, 'ja');
+                }
+            });
+            
+            // 非表示の行を含めて再配置
+            const sortedAllRows = [];
+            rows.forEach(visibleRow => {
+                const visibleIndex = allRows.indexOf(visibleRow);
+                sortedAllRows.push(visibleRow);
+                
+                // 同じ日付の非表示行を探して追加
+                for (let i = visibleIndex + 1; i < allRows.length; i++) {
+                    const nextRow = allRows[i];
+                    if (nextRow.classList.contains('hidden') || 
+                        (this.getCellValue(nextRow, 0) === '' && i === visibleIndex + 1)) {
+                        sortedAllRows.push(nextRow);
+                    } else {
+                        break;
+                    }
+                }
+            });
+            
+            // DOMに反映
+            sortedAllRows.forEach(row => this.tbody.appendChild(row));
+            
+            this.currentSort = { column: columnIndex, direction };
+        }
+        
+        getCellValue(row, columnIndex) {
+            const cell = row.cells[columnIndex];
+            return cell ? cell.textContent.trim() : '';
+        }
+        
+        compareDates(a, b) {
+            if (a === '' && b === '') return 0;
+            if (a === '') return 1;
+            if (b === '') return -1;
+            
+            const dateA = this.parseJapaneseDate(a);
+            const dateB = this.parseJapaneseDate(b);
+            
+            return dateA - dateB;
+        }
+        
+        parseJapaneseDate(dateStr) {
+            if (!dateStr) return new Date(0);
+            
+            const match = dateStr.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+            if (!match) return new Date(0);
+            
+            const [, year, month, day] = match;
+            return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        }
+    }
+    
+    // フィルター機能
+    class TableFilter {
+        constructor() {
+            this.schoolFilter = document.getElementById('schoolFilter');
+            this.eventFilter = document.getElementById('eventFilter');
+            this.dateFilter = document.getElementById('dateFilter');
+            this.resultCount = document.getElementById('resultCount');
+            this.rows = document.querySelectorAll('#eventTable tbody tr');
+            
+            this.init();
+        }
+        
+        init() {
+            this.schoolFilter.addEventListener('change', () => this.applyFilters());
+            this.eventFilter.addEventListener('change', () => this.applyFilters());
+            this.dateFilter.addEventListener('change', () => this.applyFilters());
+            
+            // 学校統計クリックイベント
+            document.querySelectorAll('.stat-item').forEach(item => {
+                item.addEventListener('click', () => this.selectSchool(item));
+            });
+        }
+        
+        selectSchool(statItem) {
+            const school = statItem.dataset.school;
+            
+            // 既に選択されている場合はクリア
+            if (statItem.classList.contains('selected')) {
+                statItem.classList.remove('selected');
+                this.schoolFilter.value = '';
+            } else {
+                // 他の選択をクリア
+                document.querySelectorAll('.stat-item').forEach(item => {
+                    item.classList.remove('selected');
+                });
+                
+                // 新しい選択
+                statItem.classList.add('selected');
+                this.schoolFilter.value = school;
+            }
+            
+            this.applyFilters();
+        }
+        
+        applyFilters() {
+            const schoolValue = this.schoolFilter.value;
+            const eventValue = this.eventFilter.value;
+            const dateValue = this.dateFilter.value;
+            
+            let visibleCount = 0;
+            
+            this.rows.forEach(row => {
+                const schoolCell = row.cells[1].textContent.trim();
+                const eventCell = row.cells[2].textContent.trim();
+                const dateCell = row.cells[0].textContent.trim();
+                
+                let visible = true;
+                
+                // 学校フィルター
+                if (schoolValue && schoolCell !== schoolValue) {
+                    visible = false;
+                }
+                
+                // イベントフィルター
+                if (eventValue && eventCell !== eventValue) {
+                    visible = false;
+                }
+                
+                // 日付フィルター
+                if (dateValue && dateCell) {
+                    const match = dateCell.match(/(\d{4})年(\d{1,2})月/);
+                    if (match) {
+                        const rowMonth = `${match[1]}-${match[2].padStart(2, '0')}`;
+                        if (rowMonth !== dateValue) {
+                            visible = false;
+                        }
+                    }
+                }
+                
+                if (visible) {
+                    row.classList.remove('hidden');
+                    visibleCount++;
+                } else {
+                    row.classList.add('hidden');
+                }
+            });
+            
+            this.resultCount.textContent = `${visibleCount}件のイベントを表示中`;
+        }
+    }
+    
+    // フィルタークリア関数
+    function clearFilters() {
+        document.getElementById('schoolFilter').value = '';
+        document.getElementById('eventFilter').value = '';
+        document.getElementById('dateFilter').value = '';
+        
+        document.querySelectorAll('.stat-item').forEach(item => {
+            item.classList.remove('selected');
+        });
+        
+        document.querySelectorAll('#eventTable tbody tr').forEach(row => {
+            row.classList.remove('hidden');
+        });
+        
+        document.getElementById('resultCount').textContent = '90件のイベントを表示中';
+    }
+    
+    // 初期化
+    document.addEventListener('DOMContentLoaded', function() {
+        new TableSorter('eventTable');
+        new TableFilter();
+    });
+    </script>
     
 </body>
 </html>

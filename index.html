@@ -768,13 +768,16 @@
             });
             this.headers[columnIndex].classList.add(direction === 'asc' ? 'sort-asc' : 'sort-desc');
             
-            // 行の取得とソート
-            const rows = Array.from(this.tbody.querySelectorAll('tr:not(.hidden)'));
-            const allRows = Array.from(this.tbody.querySelectorAll('tr'));
+            // 行をグループ化してソート
+            const rowGroups = this.groupRowsByDate();
+            const filteredGroups = rowGroups.filter(group => 
+                !group.mainRow.classList.contains('hidden')
+            );
             
-            rows.sort((a, b) => {
-                const aValue = this.getCellValue(a, columnIndex);
-                const bValue = this.getCellValue(b, columnIndex);
+            // グループをソート
+            filteredGroups.sort((groupA, groupB) => {
+                const aValue = this.getCellValue(groupA.mainRow, columnIndex);
+                const bValue = this.getCellValue(groupB.mainRow, columnIndex);
                 
                 if (columnIndex === 0) { // 日付列
                     return direction === 'asc' ? 
@@ -787,28 +790,46 @@
                 }
             });
             
-            // 非表示の行を含めて再配置
-            const sortedAllRows = [];
-            rows.forEach(visibleRow => {
-                const visibleIndex = allRows.indexOf(visibleRow);
-                sortedAllRows.push(visibleRow);
+            // DOMに反映（メイン行とその後続行をセットで配置）
+            filteredGroups.forEach(group => {
+                this.tbody.appendChild(group.mainRow);
+                group.followingRows.forEach(row => {
+                    this.tbody.appendChild(row);
+                });
+            });
+            
+            this.currentSort = { column: columnIndex, direction };
+        }
+        
+        groupRowsByDate() {
+            const allRows = Array.from(this.tbody.querySelectorAll('tr'));
+            const groups = [];
+            let currentGroup = null;
+            
+            allRows.forEach(row => {
+                const dateValue = this.getCellValue(row, 0);
                 
-                // 同じ日付の非表示行を探して追加
-                for (let i = visibleIndex + 1; i < allRows.length; i++) {
-                    const nextRow = allRows[i];
-                    if (nextRow.classList.contains('hidden') || 
-                        (this.getCellValue(nextRow, 0) === '' && i === visibleIndex + 1)) {
-                        sortedAllRows.push(nextRow);
-                    } else {
-                        break;
+                if (dateValue !== '') {
+                    // 新しい日付グループの開始
+                    if (currentGroup) {
+                        groups.push(currentGroup);
                     }
+                    currentGroup = {
+                        mainRow: row,
+                        followingRows: []
+                    };
+                } else if (currentGroup) {
+                    // 同じ日付の追加行
+                    currentGroup.followingRows.push(row);
                 }
             });
             
-            // DOMに反映
-            sortedAllRows.forEach(row => this.tbody.appendChild(row));
+            // 最後のグループを追加
+            if (currentGroup) {
+                groups.push(currentGroup);
+            }
             
-            this.currentSort = { column: columnIndex, direction };
+            return groups;
         }
         
         getCellValue(row, columnIndex) {
@@ -888,44 +909,103 @@
             const dateValue = this.dateFilter.value;
             
             let visibleCount = 0;
+            let currentDateGroup = null;
+            let groupVisible = false;
             
-            this.rows.forEach(row => {
+            this.rows.forEach((row, index) => {
                 const schoolCell = row.cells[1].textContent.trim();
                 const eventCell = row.cells[2].textContent.trim();
                 const dateCell = row.cells[0].textContent.trim();
                 
-                let visible = true;
-                
-                // 学校フィルター
-                if (schoolValue && schoolCell !== schoolValue) {
-                    visible = false;
+                // 新しい日付グループかどうかを判定
+                if (dateCell !== '') {
+                    // 前のグループの処理完了
+                    if (currentDateGroup) {
+                        this.applyGroupVisibility(currentDateGroup, groupVisible);
+                        if (groupVisible) {
+                            visibleCount += currentDateGroup.length;
+                        }
+                    }
+                    
+                    // 新しいグループ開始
+                    currentDateGroup = [row];
+                    groupVisible = this.isRowVisible(row, schoolValue, eventValue, dateValue);
+                } else {
+                    // 同じ日付グループの追加行
+                    if (currentDateGroup) {
+                        currentDateGroup.push(row);
+                        // グループ内で一つでも表示条件を満たせばグループ全体を表示
+                        if (this.isRowVisible(row, schoolValue, eventValue, dateValue)) {
+                            groupVisible = true;
+                        }
+                    }
                 }
-                
-                // イベントフィルター
-                if (eventValue && eventCell !== eventValue) {
-                    visible = false;
+            });
+            
+            // 最後のグループの処理
+            if (currentDateGroup) {
+                this.applyGroupVisibility(currentDateGroup, groupVisible);
+                if (groupVisible) {
+                    visibleCount += currentDateGroup.length;
                 }
+            }
+            
+            this.resultCount.textContent = `${visibleCount}件のイベントを表示中`;
+        }
+        
+        isRowVisible(row, schoolValue, eventValue, dateValue) {
+            const schoolCell = row.cells[1].textContent.trim();
+            const eventCell = row.cells[2].textContent.trim();
+            const dateCell = row.cells[0].textContent.trim();
+            
+            // 学校フィルター
+            if (schoolValue && schoolCell !== schoolValue) {
+                return false;
+            }
+            
+            // イベントフィルター
+            if (eventValue && eventCell !== eventValue) {
+                return false;
+            }
+            
+            // 日付フィルター（空白セルの場合は前の行の日付を参照）
+            if (dateValue) {
+                let targetDate = dateCell;
                 
-                // 日付フィルター
-                if (dateValue && dateCell) {
-                    const match = dateCell.match(/(\d{4})年(\d{1,2})月/);
-                    if (match) {
-                        const rowMonth = `${match[1]}-${match[2].padStart(2, '0')}`;
-                        if (rowMonth !== dateValue) {
-                            visible = false;
+                // 空白の場合は前の日付を持つ行を探す
+                if (!targetDate) {
+                    const currentIndex = Array.from(this.rows).indexOf(row);
+                    for (let i = currentIndex - 1; i >= 0; i--) {
+                        const prevDate = this.rows[i].cells[0].textContent.trim();
+                        if (prevDate) {
+                            targetDate = prevDate;
+                            break;
                         }
                     }
                 }
                 
+                if (targetDate) {
+                    const match = targetDate.match(/(\d{4})年(\d{1,2})月/);
+                    if (match) {
+                        const rowMonth = `${match[1]}-${match[2].padStart(2, '0')}`;
+                        if (rowMonth !== dateValue) {
+                            return false;
+                        }
+                    }
+                }
+            }
+            
+            return true;
+        }
+        
+        applyGroupVisibility(group, visible) {
+            group.forEach(row => {
                 if (visible) {
                     row.classList.remove('hidden');
-                    visibleCount++;
                 } else {
                     row.classList.add('hidden');
                 }
             });
-            
-            this.resultCount.textContent = `${visibleCount}件のイベントを表示中`;
         }
     }
     
